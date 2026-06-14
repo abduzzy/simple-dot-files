@@ -133,6 +133,34 @@ task_zoxide() {
 }
 
 # ==================================================
+# Task: Install sesh binary
+# ==================================================
+task_sesh() {
+    echo "  [sesh] Installing..."
+
+    ensure_local_bin
+    if command -v sesh >/dev/null 2>&1; then
+        echo "    Binary already installed at $(command -v sesh)"
+        echo "  [sesh] Done."
+        return
+    fi
+
+    echo "    Downloading latest sesh binary..."
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+        *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+
+    SESH_URL="https://github.com/joshmedeski/sesh/releases/latest/download/sesh_linux_${ARCH}.tar.gz"
+    curl -fsSL "$SESH_URL" | tar xz -C "$LOCAL_BIN" sesh
+    chmod +x "$LOCAL_BIN/sesh"
+    echo "    Installed to $LOCAL_BIN/sesh"
+    echo "  [sesh] Done."
+}
+
+# ==================================================
 # Main
 # ==================================================
 main() {
@@ -142,6 +170,7 @@ main() {
     task_tmux_config
     task_fzf
     task_zoxide
+    task_sesh
     # task_nvim       # TODO
     # task_git        # TODO
     # task_ghostty    # TODO
