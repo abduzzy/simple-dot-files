@@ -161,6 +161,66 @@ task_sesh() {
 }
 
 # ==================================================
+# Task: Install tv (television) binary
+# ==================================================
+task_tv() {
+    echo "  [tv] Installing..."
+
+    ensure_local_bin
+    if command -v tv >/dev/null 2>&1; then
+        echo "    Binary already installed at $(command -v tv)"
+        echo "  [tv] Done."
+        return
+    fi
+
+    echo "    Downloading latest tv binary..."
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  ARCH="x86_64" ;;
+        aarch64) ARCH="aarch64" ;;
+        *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+
+    TV_URL="https://github.com/alexpasmantier/television/releases/latest/download/television-${ARCH}-unknown-linux-musl.tar.gz"
+    curl -fsSL "$TV_URL" | tar xz -C "$LOCAL_BIN"
+    chmod +x "$LOCAL_BIN/tv"
+    echo "    Installed to $LOCAL_BIN/tv"
+    echo "  [tv] Done."
+}
+
+# ==================================================
+# Task: Install atuin binary + shell integration
+# ==================================================
+task_atuin() {
+    echo "  [atuin] Installing..."
+
+    # Binary
+    ensure_local_bin
+    if ! command -v atuin >/dev/null 2>&1; then
+        echo "    Downloading latest atuin binary..."
+        ARCH=$(uname -m)
+        case "$ARCH" in
+            x86_64)  ARCH="x86_64" ;;
+            aarch64) ARCH="aarch64" ;;
+            *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+
+        ATUIN_URL="https://github.com/atuinsh/atuin/releases/latest/download/atuin-${ARCH}-unknown-linux-gnu.tar.gz"
+        curl -fsSL "$ATUIN_URL" | tar xz -C "$LOCAL_BIN" --strip-components=1
+        chmod +x "$LOCAL_BIN/atuin"
+        echo "    Installed to $LOCAL_BIN/atuin"
+    else
+        echo "    Binary already installed at $(command -v atuin)"
+    fi
+
+    # Shell integration (bash)
+    echo "    Adding shell integration to ~/.bashrc..."
+    ensure_line "$BASHRC" 'eval "$(atuin init bash)"'
+
+    echo "  [atuin] Done."
+}
+
+# ==================================================
 # Main
 # ==================================================
 main() {
@@ -171,6 +231,8 @@ main() {
     task_fzf
     task_zoxide
     task_sesh
+    task_tv
+    task_atuin
     # task_nvim       # TODO
     # task_git        # TODO
     # task_ghostty    # TODO
