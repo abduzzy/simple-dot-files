@@ -4,6 +4,28 @@ set -e
 DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 TMUX_CONFIG_DIR="$HOME/.config/tmux"
 TPM_DIR="$TMUX_CONFIG_DIR/plugins/tpm"
+LOCAL_BIN="$HOME/.local/bin"
+BASHRC="$HOME/.bashrc"
+
+# ==================================================
+# Utility: ensure ~/.local/bin exists
+# ==================================================
+ensure_local_bin() {
+    mkdir -p "$LOCAL_BIN"
+}
+
+# ==================================================
+# Utility: idempotent line adder
+# ==================================================
+ensure_line() {
+    file="$1"
+    line="$2"
+    touch "$file"
+    if grep -qsF -- "$line" "$file"; then
+        return 0
+    fi
+    echo "$line" >> "$file"
+}
 
 # ==================================================
 # Task: Install / update tpm
@@ -55,22 +77,80 @@ task_tmux_config() {
 }
 
 # ==================================================
-# Main — add new tasks here
+# Task: Install fzf binary + shell integration
+# ==================================================
+task_fzf() {
+    echo "  [fzf] Installing..."
+
+    # Binary
+    ensure_local_bin
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "    Downloading latest fzf binary..."
+        FZF_URL="https://github.com/junegunn/fzf/releases/latest/download/fzf-$(uname -s)_$(uname -m).tar.gz"
+        curl -fsSL "$FZF_URL" | tar xz -C "$LOCAL_BIN"
+        chmod +x "$LOCAL_BIN/fzf"
+        echo "    Installed to $LOCAL_BIN/fzf"
+    else
+        echo "    Binary already installed at $(command -v fzf)"
+    fi
+
+    # Shell integration (bash)
+    echo "    Adding shell integration to ~/.bashrc..."
+    ensure_line "$BASHRC" 'eval "$(fzf --bash)"'
+
+    echo "  [fzf] Done."
+}
+
+# ==================================================
+# Task: Install zoxide binary + shell integration
+# ==================================================
+task_zoxide() {
+    echo "  [zoxide] Installing..."
+
+    # Binary
+    ensure_local_bin
+    if ! command -v zoxide >/dev/null 2>&1; then
+        echo "    Downloading latest zoxide binary..."
+        ARCH=$(uname -m)
+        case "$ARCH" in
+            x86_64)  ARCH="x86_64" ;;
+            aarch64) ARCH="aarch64" ;;
+            *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+        ZOXIDE_URL="https://github.com/ajeetdsouza/zoxide/releases/latest/download/zoxide-${ARCH}-unknown-linux-musl"
+        curl -fsSL "$ZOXIDE_URL" -o "$LOCAL_BIN/zoxide"
+        chmod +x "$LOCAL_BIN/zoxide"
+        echo "    Installed to $LOCAL_BIN/zoxide"
+    else
+        echo "    Binary already installed at $(command -v zoxide)"
+    fi
+
+    # Shell integration (bash)
+    echo "    Adding shell integration to ~/.bashrc..."
+    ensure_line "$BASHRC" 'eval "$(zoxide init bash --cmd cd)"'
+
+    echo "  [zoxide] Done."
+}
+
+# ==================================================
+# Main
 # ==================================================
 main() {
     echo "==> Installing dotfiles..."
 
     task_tpm
     task_tmux_config
+    task_fzf
+    task_zoxide
     # task_nvim       # TODO
     # task_git        # TODO
-    # task_zsh        # TODO
     # task_ghostty    # TODO
 
     echo ""
     echo "==> All done!"
-    echo "    Reload tmux: tmux source-file ~/.config/tmux/tmux.conf"
-    echo "    Then press Prefix + I to install plugins."
+    echo "    Run:  source ~/.bashrc"
+    echo "    Then: tmux source-file ~/.config/tmux/tmux.conf"
+    echo "    Then in tmux: Prefix + I  (install plugins)"
 }
 
 main "$@"
