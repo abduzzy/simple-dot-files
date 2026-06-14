@@ -1,0 +1,35 @@
+# ==========================================
+# Font
+# ==========================================
+# font-family = JetBrains Mono
+# font-size = 13
+
+# ==========================================
+# Theme - Catppuccin Mocha
+# ==========================================
+theme = catppuccin-mocha
+
+# ==========================================
+# Window
+# ==========================================
+# background-opacity = 0.95
+# window-save-state = always
+# window-padding-x = 4
+# window-padding-y = 2
+
+# ==========================================
+# Shell
+# ==========================================
+shell-integration = bash
+copy-on-select = clipboard
+confirm-close-surface = false
+command = bash -lc "tmux new-session -A -D -s ghostty"
+
+# ==========================================
+# Keybindings
+# ==========================================
+# Ctrl+Enter fix for tmux
+# keybind = ctrl+enter=send_text:\x1b[13;5u
+
+# Quick reload config
+# keybind = super+shift+,=reload_config

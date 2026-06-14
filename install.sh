@@ -221,6 +221,52 @@ task_atuin() {
 }
 
 # ==================================================
+# Task: Deploy ghostty config
+# ==================================================
+task_ghostty() {
+    echo "  [ghostty] Deploying ghostty config..."
+
+    GHOSTTY_CONFIG_DIR="$HOME/.config/ghostty"
+
+    deploy_g_stow() {
+        cd "$DOTFILES"
+        stow -R --target="$HOME" .
+    }
+
+    deploy_g_ln() {
+        mkdir -p "$GHOSTTY_CONFIG_DIR"
+        ln -sf "$DOTFILES/.config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+    }
+
+    deploy_g_cp() {
+        mkdir -p "$GHOSTTY_CONFIG_DIR"
+        cp "$DOTFILES/.config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+    }
+
+    if command -v stow >/dev/null 2>&1; then
+        echo "    Using stow..."
+        deploy_g_stow
+    elif command -v ln >/dev/null 2>&1; then
+        echo "    Creating symlinks..."
+        deploy_g_ln
+    else
+        echo "    Copying files..."
+        deploy_g_cp
+    fi
+    echo "  [ghostty] Done."
+}
+
+# ==================================================
+# Task: Install ghostty app
+# ==================================================
+task_install_ghostty() {
+    echo "  [ghostty-app] Installing/updating ghostty..."
+    echo "    Running ghostty-ubuntu install script..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
+    echo "  [ghostty-app] Done."
+}
+
+# ==================================================
 # Main
 # ==================================================
 main() {
@@ -233,9 +279,10 @@ main() {
     task_sesh
     task_tv
     task_atuin
+    task_ghostty
+    task_install_ghostty
     # task_nvim       # TODO
     # task_git        # TODO
-    # task_ghostty    # TODO
 
     echo ""
     echo "==> All done!"
