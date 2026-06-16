@@ -56,11 +56,13 @@ task_tmux_config() {
     deploy_with_ln() {
         mkdir -p "$TMUX_CONFIG_DIR"
         ln -sf "$DOTFILES/.config/tmux/tmux.conf" "$TMUX_CONFIG_DIR/tmux.conf"
+        ln -sf "$DOTFILES/.config/tmux/catppuccin.tmux.conf" "$TMUX_CONFIG_DIR/catppuccin.tmux.conf"
     }
 
     deploy_with_cp() {
         mkdir -p "$TMUX_CONFIG_DIR"
         cp "$DOTFILES/.config/tmux/tmux.conf" "$TMUX_CONFIG_DIR/tmux.conf"
+        cp "$DOTFILES/.config/tmux/catppuccin.tmux.conf" "$TMUX_CONFIG_DIR/catppuccin.tmux.conf"
     }
 
     if command -v stow >/dev/null 2>&1; then
