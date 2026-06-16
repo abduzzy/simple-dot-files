@@ -37,7 +37,7 @@ task_tpm() {
         git -C "$TPM_DIR" pull --ff-only
     else
         echo "    Cloning tpm..."
-        git clone https://github.com/tmux-plugins/tpm "$TPM_DIR"
+        git clone https://github.com/RyanMacG/tpm-redux.git "$TPM_DIR"
     fi
     echo "  [tpm] Done."
 }
@@ -148,12 +148,12 @@ task_sesh() {
     echo "    Downloading latest sesh binary..."
     ARCH=$(uname -m)
     case "$ARCH" in
-        x86_64)  ARCH="amd64" ;;
+        x86_64)  ARCH="x86_64" ;;
         aarch64) ARCH="arm64" ;;
         *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
     esac
 
-    SESH_URL="https://github.com/joshmedeski/sesh/releases/latest/download/sesh_linux_${ARCH}.tar.gz"
+    SESH_URL="https://github.com/joshmedeski/sesh/releases/latest/download/sesh_Linux_${ARCH}.tar.gz"
     curl -fsSL "$SESH_URL" | tar xz -C "$LOCAL_BIN" sesh
     chmod +x "$LOCAL_BIN/sesh"
     echo "    Installed to $LOCAL_BIN/sesh"
@@ -161,31 +161,91 @@ task_sesh() {
 }
 
 # ==================================================
-# Task: Install tv (television) binary
+# Task: Install tv (television) binary + shell integration
 # ==================================================
 task_tv() {
     echo "  [tv] Installing..."
 
     ensure_local_bin
-    if command -v tv >/dev/null 2>&1; then
+    if ! command -v tv >/dev/null 2>&1; then
+        echo "    Fetching latest tv release info..."
+        ARCH=$(uname -m)
+        case "$ARCH" in
+            x86_64)  TV_TARGET="x86_64-unknown-linux-musl" ;;
+            aarch64) TV_TARGET="aarch64-unknown-linux-musl" ;;
+            *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+
+        TV_URL=$(curl -fsSL https://api.github.com/repos/alexpasmantier/television/releases/latest \
+            | grep browser_download_url \
+            | grep "$TV_TARGET.tar.gz" \
+            | grep -v sha256 \
+            | head -1 \
+            | cut -d '"' -f 4)
+
+        if [ -z "$TV_URL" ]; then
+            echo "    Failed to find download URL"
+            exit 1
+        fi
+
+        echo "    Downloading tv..."
+        TMPDIR=$(mktemp -d)
+        curl -fsSL "$TV_URL" | tar xz -C "$TMPDIR"
+        find "$TMPDIR" -type f -name "tv" -exec mv {} "$LOCAL_BIN/tv" \;
+        chmod +x "$LOCAL_BIN/tv"
+        rm -rf "$TMPDIR"
+        echo "    Installed to $LOCAL_BIN/tv"
+    else
         echo "    Binary already installed at $(command -v tv)"
-        echo "  [tv] Done."
+    fi
+
+    # Shell integration (bash) — always run
+    echo "    Adding shell integration to ~/.bashrc..."
+    ensure_line "$BASHRC" 'eval "$(tv init bash)"'
+
+    echo "  [tv] Done."
+}
+
+# ==================================================
+# Task: Install fd binary
+# ==================================================
+task_fd() {
+    echo "  [fd] Installing..."
+
+    ensure_local_bin
+    if command -v fd >/dev/null 2>&1; then
+        echo "    Binary already installed at $(command -v fd)"
+        echo "  [fd] Done."
         return
     fi
 
-    echo "    Downloading latest tv binary..."
+    echo "    Fetching latest fd release info..."
     ARCH=$(uname -m)
     case "$ARCH" in
-        x86_64)  ARCH="x86_64" ;;
-        aarch64) ARCH="aarch64" ;;
+        x86_64)  FD_TARGET="x86_64-unknown-linux-musl" ;;
+        aarch64) FD_TARGET="aarch64-unknown-linux-musl" ;;
         *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
     esac
 
-    TV_URL="https://github.com/alexpasmantier/television/releases/latest/download/television-${ARCH}-unknown-linux-musl.tar.gz"
-    curl -fsSL "$TV_URL" | tar xz -C "$LOCAL_BIN"
-    chmod +x "$LOCAL_BIN/tv"
-    echo "    Installed to $LOCAL_BIN/tv"
-    echo "  [tv] Done."
+    FD_URL=$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest \
+        | grep browser_download_url \
+        | grep "$FD_TARGET.tar.gz" \
+        | head -1 \
+        | cut -d '"' -f 4)
+
+    if [ -z "$FD_URL" ]; then
+        echo "    Failed to find download URL"
+        exit 1
+    fi
+
+    echo "    Downloading fd..."
+    TMPDIR=$(mktemp -d)
+    curl -fsSL "$FD_URL" | tar xz -C "$TMPDIR"
+    find "$TMPDIR" -type f -name "fd" -exec mv {} "$LOCAL_BIN/fd" \;
+    chmod +x "$LOCAL_BIN/fd"
+    rm -rf "$TMPDIR"
+    echo "    Installed to $LOCAL_BIN/fd"
+    echo "  [fd] Done."
 }
 
 # ==================================================
@@ -221,6 +281,29 @@ task_atuin() {
 }
 
 # ==================================================
+# Task: Install bash-preexec for atuin
+# ==================================================
+task_bash_preexec() {
+    echo "  [bash-preexec] Installing..."
+
+    BASH_PREEXEC_DIR="$HOME/.local/share/bash-preexec"
+    if [ -f "$BASH_PREEXEC_DIR/bash-preexec.sh" ]; then
+        echo "    bash-preexec already installed"
+        echo "  [bash-preexec] Done."
+        return
+    fi
+
+    echo "    Downloading bash-preexec 0.6.0..."
+    mkdir -p "$BASH_PREEXEC_DIR"
+    curl -fsSL "https://raw.githubusercontent.com/rcaloras/bash-preexec/0.6.0/bash-preexec.sh" -o "$BASH_PREEXEC_DIR/bash-preexec.sh"
+
+    echo "    Adding bash-preexec to ~/.bashrc..."
+    ensure_line "$BASHRC" 'source ~/.local/share/bash-preexec/bash-preexec.sh'
+
+    echo "  [bash-preexec] Done."
+}
+
+# ==================================================
 # Task: Deploy ghostty config
 # ==================================================
 task_ghostty() {
@@ -236,11 +319,20 @@ task_ghostty() {
     deploy_g_ln() {
         mkdir -p "$GHOSTTY_CONFIG_DIR"
         ln -sf "$DOTFILES/.config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+        if [ -d "$DOTFILES/.config/ghostty/themes" ]; then
+            mkdir -p "$GHOSTTY_CONFIG_DIR/themes"
+            for theme_file in "$DOTFILES/.config/ghostty/themes/"*; do
+                [ -f "$theme_file" ] && ln -sf "$theme_file" "$GHOSTTY_CONFIG_DIR/themes/"
+            done
+        fi
     }
 
     deploy_g_cp() {
         mkdir -p "$GHOSTTY_CONFIG_DIR"
         cp "$DOTFILES/.config/ghostty/config" "$GHOSTTY_CONFIG_DIR/config"
+        if [ -d "$DOTFILES/.config/ghostty/themes" ]; then
+            cp -r "$DOTFILES/.config/ghostty/themes/"* "$GHOSTTY_CONFIG_DIR/themes/"
+        fi
     }
 
     if command -v stow >/dev/null 2>&1; then
@@ -260,7 +352,12 @@ task_ghostty() {
 # Task: Install ghostty app
 # ==================================================
 task_install_ghostty() {
-    echo "  [ghostty-app] Installing/updating ghostty..."
+    echo "  [ghostty-app] Installing ghostty..."
+    if command -v ghostty >/dev/null 2>&1; then
+        echo "    Ghostty already installed at $(command -v ghostty)"
+        echo "  [ghostty-app] Done."
+        return
+    fi
     echo "    Running ghostty-ubuntu install script..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
     echo "  [ghostty-app] Done."
@@ -272,10 +369,12 @@ task_install_ghostty() {
 main() {
     echo "==> Installing dotfiles..."
 
+    task_bash_preexec
     task_tpm
     task_tmux_config
     task_fzf
     task_zoxide
+    task_fd
     task_sesh
     task_tv
     task_atuin
