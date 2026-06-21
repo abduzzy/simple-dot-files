@@ -439,6 +439,48 @@ task_maple_font() {
 }
 
 # ==================================================
+# Task: Deploy nvim config
+# ==================================================
+task_nvim() {
+    echo "  [nvim] Deploying nvim config..."
+
+    NVIM_CONFIG_DIR="$HOME/.config/nvim"
+
+    deploy_n_stow() {
+        cd "$DOTFILES"
+        stow -R --target="$HOME" .
+    }
+
+    deploy_n_ln() {
+        mkdir -p "$NVIM_CONFIG_DIR/lua/plugins"
+        ln -sf "$DOTFILES/.config/nvim/init.lua" "$NVIM_CONFIG_DIR/init.lua"
+        ln -sf "$DOTFILES/.config/nvim/nvim-pack-lock.json" "$NVIM_CONFIG_DIR/nvim-pack-lock.json"
+        for f in "$DOTFILES/.config/nvim/lua/plugins/"*.lua; do
+            [ -f "$f" ] && ln -sf "$f" "$NVIM_CONFIG_DIR/lua/plugins/"
+        done
+    }
+
+    deploy_n_cp() {
+        mkdir -p "$NVIM_CONFIG_DIR/lua/plugins"
+        cp "$DOTFILES/.config/nvim/init.lua" "$NVIM_CONFIG_DIR/init.lua"
+        cp "$DOTFILES/.config/nvim/nvim-pack-lock.json" "$NVIM_CONFIG_DIR/nvim-pack-lock.json"
+        cp "$DOTFILES/.config/nvim/lua/plugins/"*.lua "$NVIM_CONFIG_DIR/lua/plugins/"
+    }
+
+    if command -v stow >/dev/null 2>&1; then
+        echo "    Using stow..."
+        deploy_n_stow
+    elif command -v ln >/dev/null 2>&1; then
+        echo "    Creating symlinks..."
+        deploy_n_ln
+    else
+        echo "    Copying files..."
+        deploy_n_cp
+    fi
+    echo "  [nvim] Done."
+}
+
+# ==================================================
 # Main
 # ==================================================
 main() {
@@ -457,7 +499,7 @@ main() {
     task_install_ghostty
     task_yazi
     task_maple_font
-    # task_nvim       # TODO
+    task_nvim
     # task_git        # TODO
 
     echo ""
