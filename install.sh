@@ -251,6 +251,50 @@ task_fd() {
 }
 
 # ==================================================
+# Task: Install yazi binary
+# ==================================================
+task_yazi() {
+    echo "  [yazi] Installing..."
+
+    ensure_local_bin
+    if command -v yazi >/dev/null 2>&1; then
+        echo "    Binary already installed at $(command -v yazi)"
+        echo "  [yazi] Done."
+        return
+    fi
+
+    echo "    Fetching latest yazi release info..."
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  YAZI_TARGET="x86_64-unknown-linux-musl" ;;
+        aarch64) YAZI_TARGET="aarch64-unknown-linux-musl" ;;
+        *)       echo "    Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+
+    YAZI_URL=$(curl -fsSL https://api.github.com/repos/sxyazi/yazi/releases/latest \
+        | grep browser_download_url \
+        | grep "$YAZI_TARGET.zip" \
+        | head -1 \
+        | cut -d '"' -f 4)
+
+    if [ -z "$YAZI_URL" ]; then
+        echo "    Failed to find download URL"
+        exit 1
+    fi
+
+    echo "    Downloading yazi..."
+    TMPDIR=$(mktemp -d)
+    curl -fsSL "$YAZI_URL" -o "$TMPDIR/yazi.zip"
+    unzip -qo "$TMPDIR/yazi.zip" -d "$TMPDIR"
+    find "$TMPDIR" -type f -name "yazi" -exec mv {} "$LOCAL_BIN/yazi" \;
+    find "$TMPDIR" -type f -name "ya" -exec mv {} "$LOCAL_BIN/ya" \;
+    chmod +x "$LOCAL_BIN/yazi" "$LOCAL_BIN/ya"
+    rm -rf "$TMPDIR"
+    echo "    Installed to $LOCAL_BIN/yazi and $LOCAL_BIN/ya"
+    echo "  [yazi] Done."
+}
+
+# ==================================================
 # Task: Install atuin binary + shell integration
 # ==================================================
 task_atuin() {
@@ -366,6 +410,35 @@ task_install_ghostty() {
 }
 
 # ==================================================
+# Task: Install Maple Mono Nerd Font
+# ==================================================
+task_maple_font() {
+    echo "  [maple-font] Installing Maple Mono NF..."
+
+    FONT_DIR="$HOME/.local/share/fonts"
+    mkdir -p "$FONT_DIR"
+
+    if ls "$FONT_DIR/MapleMono"*.ttf >/dev/null 2>&1; then
+        echo "    Maple Mono NF already installed"
+        echo "  [maple-font] Done."
+        return
+    fi
+
+    echo "    Downloading Maple Mono NF..."
+    FONT_URL="https://github.com/subframe7536/maple-font/releases/latest/download/MapleMono-NF-unhinted.zip"
+    TMPDIR=$(mktemp -d)
+    curl -fsSL "$FONT_URL" -o "$TMPDIR/MapleMono-NF-unhinted.zip"
+    unzip -qo "$TMPDIR/MapleMono-NF-unhinted.zip" -d "$TMPDIR/fonts"
+    find "$TMPDIR/fonts" -type f \( -name "*.ttf" -o -name "*.otf" \) -exec mv {} "$FONT_DIR/" \;
+    rm -rf "$TMPDIR"
+
+    echo "    Updating font cache..."
+    fc-cache -fv >/dev/null 2>&1
+    echo "    Installed to $FONT_DIR"
+    echo "  [maple-font] Done."
+}
+
+# ==================================================
 # Main
 # ==================================================
 main() {
@@ -382,6 +455,8 @@ main() {
     task_atuin
     task_ghostty
     task_install_ghostty
+    task_yazi
+    task_maple_font
     # task_nvim       # TODO
     # task_git        # TODO
 
