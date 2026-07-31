@@ -42,6 +42,7 @@ new_cwd = "follow"
 # "catppuccin" is Herdr's built-in default theme already.
 name = "catppuccin"
 
+auto_switch = false
 [ui]
 # was: @catppuccin_window_current_number_color "#{@thm_peach}" (peach highlight on active window)
 accent = "#fab387" # catppuccin mocha peach (@thm_peach)
@@ -52,3 +53,6 @@ mouse_capture = true
 [experimental]
 # was: set -g allow-passthrough on (kitty image protocol / OSC passthrough)
 kitty_graphics = true
+
+[ui.toast]
+delivery = "system"

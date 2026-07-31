@@ -23,7 +23,7 @@ theme = catppuccin-mocha
 shell-integration = bash
 copy-on-select = clipboard
 confirm-close-surface = false
-command = bash -lc "tmux new-session -A -D -s ghostty"
+# command = bash -lc "tmux new-session -A -D -s ghostty"
 
 # ==========================================
 # Keybindings

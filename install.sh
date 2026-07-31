@@ -413,6 +413,44 @@ task_ghostty() {
 }
 
 # ==================================================
+# Task: Deploy kitty config
+# ==================================================
+task_kitty() {
+  echo "  [kitty] Deploying kitty config..."
+
+  KITTY_CONFIG_DIR="$HOME/.config/kitty"
+
+  deploy_k_stow() {
+    cd "$DOTFILES"
+    stow -R --target="$HOME" .
+  }
+
+  deploy_k_ln() {
+    mkdir -p "$KITTY_CONFIG_DIR"
+    ln -sf "$DOTFILES/.config/kitty/kitty.conf" "$KITTY_CONFIG_DIR/kitty.conf"
+    ln -sf "$DOTFILES/.config/kitty/mocha.conf" "$KITTY_CONFIG_DIR/mocha.conf"
+  }
+
+  deploy_k_cp() {
+    mkdir -p "$KITTY_CONFIG_DIR"
+    cp "$DOTFILES/.config/kitty/kitty.conf" "$KITTY_CONFIG_DIR/kitty.conf"
+    cp "$DOTFILES/.config/kitty/mocha.conf" "$KITTY_CONFIG_DIR/mocha.conf"
+  }
+
+  if command -v stow >/dev/null 2>&1; then
+    echo "    Using stow..."
+    deploy_k_stow
+  elif command -v ln >/dev/null 2>&1; then
+    echo "    Creating symlinks..."
+    deploy_k_ln
+  else
+    echo "    Copying files..."
+    deploy_k_cp
+  fi
+  echo "  [kitty] Done."
+}
+
+# ==================================================
 # Task: Install ghostty app
 # ==================================================
 task_install_ghostty() {
@@ -515,6 +553,7 @@ main() {
   task_atuin
   task_ghostty
   task_install_ghostty
+  task_kitty
   task_yazi
   task_maple_font
   task_nvim
