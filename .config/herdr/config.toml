@@ -1,3 +1,4 @@
+onboarding = false
 # ~/.config/herdr/config.toml
 # Converted from tmux.conf + catppuccin_tmux.conf
 #
@@ -43,7 +44,7 @@ name = "catppuccin"
 
 [ui]
 # was: @catppuccin_window_current_number_color "#{@thm_peach}" (peach highlight on active window)
-accent = "peach"
+accent = "#fab387" # catppuccin mocha peach (@thm_peach)
 
 # was: set -g mouse on (Herdr default is already true — explicit for clarity)
 mouse_capture = true
