@@ -1,0 +1,53 @@
+# ~/.config/herdr/config.toml
+# Converted from tmux.conf + catppuccin_tmux.conf
+#
+# Notes on things that needed NO porting (Herdr already matches your tmux setup
+# by default) live in the chat response, not here, to keep this file clean.
+
+[keys]
+# Was: set-option -g prefix C-Space
+prefix = "ctrl+space"
+
+# --- Pane nav (h/j/k/l) — already Herdr's default, listed here for visibility ---
+focus_pane_left  = "prefix+h"
+focus_pane_down  = "prefix+j"
+focus_pane_up    = "prefix+k"
+focus_pane_right = "prefix+l"
+
+# --- Splits ---
+# tmux defaults you kept: '"' = split horizontal (stacked), '%' = split vertical (side-by-side)
+# Herdr's own mnemonic defaults are prefix+v (vertical/side-by-side) and prefix+minus (horizontal/stacked).
+# Uncomment below ONLY if you want literal tmux muscle memory instead of Herdr's defaults —
+# verify the exact key names for quote/percent via `prefix+?` in-app help first.
+# split_vertical   = "prefix+percent"
+# split_horizontal = "prefix+quote"
+
+# --- Session/workspace switching ---
+# was: bind K display-popup ... tv sesh  /  bind L run-shell "sesh last"
+# Not ported: Herdr has a native fuzzy jump prompt and workspace picker that
+# cover both use cases without a plugin. No config needed — use:
+#   prefix+g  -> goto: fuzzy jump to any workspace/agent/session
+#   prefix+w  -> workspace picker: browse/switch open workspaces
+# If you specifically want zoxide-style "create workspace from a directory
+# I haven't opened yet," look at the community herdr-plugin-sesh plugin instead.
+
+[terminal]
+# was: bind c/"/% ... -c "#{pane_current_path}"
+# "follow" is actually Herdr's default already — included for clarity/explicitness.
+new_cwd = "follow"
+
+[theme]
+# was: set -g @catppuccin_flavor 'mocha' (+ catppuccin/tmux plugin)
+# "catppuccin" is Herdr's built-in default theme already.
+name = "catppuccin"
+
+[ui]
+# was: @catppuccin_window_current_number_color "#{@thm_peach}" (peach highlight on active window)
+accent = "peach"
+
+# was: set -g mouse on (Herdr default is already true — explicit for clarity)
+mouse_capture = true
+
+[experimental]
+# was: set -g allow-passthrough on (kitty image protocol / OSC passthrough)
+kitty_graphics = true
