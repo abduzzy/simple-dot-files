@@ -6,6 +6,8 @@ TMUX_CONFIG_DIR="$HOME/.config/tmux"
 TPM_DIR="$TMUX_CONFIG_DIR/plugins/tpm"
 LOCAL_BIN="$HOME/.local/bin"
 BASHRC="$HOME/.bashrc"
+MISE_CONFIG_DIR="$HOME/.config/mise"
+MISE_CONFIG_FILE="$MISE_CONFIG_DIR/config.toml"
 
 # ==================================================
 # Utility: ensure ~/.local/bin exists
@@ -25,6 +27,123 @@ ensure_line() {
     return 0
   fi
   echo "$line" >>"$file"
+}
+
+# ==================================================
+# Utility: add mise activation before shell integrations
+# ==================================================
+ensure_mise_activation() {
+  file="$1"
+  line="$2"
+  touch "$file"
+
+  tmp="$file.tmp.$$"
+  awk -v line="$line" '
+    $0 == line { next }
+    !done && ($0 ~ /eval "\$\(fzf --bash\)"/ ||
+              $0 ~ /eval "\$\(zoxide init bash/ ||
+              $0 ~ /eval "\$\(tv init bash\)"/ ||
+              $0 ~ /eval "\$\(atuin init bash\)"/) {
+      print line
+      done = 1
+    }
+    { print }
+    END { if (!done) print line }
+  ' "$file" >"$tmp"
+  mv "$tmp" "$file"
+}
+
+# ==================================================
+# Task: Install mise + shell activation
+# ==================================================
+task_mise() {
+  echo "  [mise] Installing..."
+
+  ensure_local_bin
+  if ! command -v mise >/dev/null 2>&1; then
+    echo "    Running official mise installer..."
+    curl -fsSL https://mise.run | sh
+  else
+    echo "    Binary already installed at $(command -v mise)"
+  fi
+
+  export PATH="$LOCAL_BIN:$PATH"
+
+  echo "    Adding activation to ~/.bashrc..."
+  ensure_mise_activation "$BASHRC" 'eval "$(mise activate bash)"'
+
+  echo "  [mise] Done."
+}
+
+# ==================================================
+# Task: Deploy mise config
+# ==================================================
+task_mise_config() {
+  echo "  [mise] Deploying mise config..."
+
+  mkdir -p "$MISE_CONFIG_DIR"
+
+  backup_existing_mise_config() {
+    if [ ! -e "$MISE_CONFIG_FILE" ] && [ ! -L "$MISE_CONFIG_FILE" ]; then
+      return 0
+    fi
+
+    if [ -L "$MISE_CONFIG_FILE" ]; then
+      current_target=$(readlink -f "$MISE_CONFIG_FILE" 2>/dev/null || true)
+      repo_target=$(readlink -f "$DOTFILES/.config/mise/config.toml" 2>/dev/null || true)
+      if [ "$current_target" = "$repo_target" ]; then
+        return 0
+      fi
+    fi
+
+    BACKUP_FILE="$MISE_CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S)"
+    echo "    Backing up existing config to $BACKUP_FILE"
+    mv "$MISE_CONFIG_FILE" "$BACKUP_FILE"
+  }
+
+  deploy_m_stow() {
+    backup_existing_mise_config
+    cd "$DOTFILES"
+    stow -R --target="$HOME" .
+  }
+
+  deploy_m_ln() {
+    backup_existing_mise_config
+    ln -sf "$DOTFILES/.config/mise/config.toml" "$MISE_CONFIG_FILE"
+  }
+
+  deploy_m_cp() {
+    backup_existing_mise_config
+    cp "$DOTFILES/.config/mise/config.toml" "$MISE_CONFIG_FILE"
+  }
+
+  if command -v stow >/dev/null 2>&1; then
+    echo "    Using stow..."
+    deploy_m_stow
+  elif command -v ln >/dev/null 2>&1; then
+    echo "    Creating symlinks..."
+    deploy_m_ln
+  else
+    echo "    Copying files..."
+    deploy_m_cp
+  fi
+  echo "  [mise] Done."
+}
+
+# ==================================================
+# Task: Install mise-managed tools + shell integration
+# ==================================================
+task_mise_install() {
+  echo "  [mise] Installing tools..."
+
+  mise install
+
+  echo "    Adding shell integration to ~/.bashrc..."
+  ensure_line "$BASHRC" 'eval "$(fzf --bash)"'
+  ensure_line "$BASHRC" 'eval "$(zoxide init bash --cmd cd)"'
+  ensure_line "$BASHRC" 'eval "$(tv init bash)"'
+
+  echo "  [mise] Done."
 }
 
 # ==================================================
@@ -76,237 +195,6 @@ task_tmux_config() {
     deploy_with_cp
   fi
   echo "  [config] Done."
-}
-
-# ==================================================
-# Task: Install fzf binary + shell integration
-# ==================================================
-task_fzf() {
-  echo "  [fzf] Installing..."
-
-  # Binary
-  ensure_local_bin
-  if ! command -v fzf >/dev/null 2>&1; then
-    echo "    Downloading latest fzf binary..."
-    FZF_URL="https://github.com/junegunn/fzf/releases/latest/download/fzf-$(uname -s)_$(uname -m).tar.gz"
-    curl -fsSL "$FZF_URL" | tar xz -C "$LOCAL_BIN"
-    chmod +x "$LOCAL_BIN/fzf"
-    echo "    Installed to $LOCAL_BIN/fzf"
-  else
-    echo "    Binary already installed at $(command -v fzf)"
-  fi
-
-  # Shell integration (bash)
-  echo "    Adding shell integration to ~/.bashrc..."
-  ensure_line "$BASHRC" 'eval "$(fzf --bash)"'
-
-  echo "  [fzf] Done."
-}
-
-# ==================================================
-# Task: Install zoxide binary + shell integration
-# ==================================================
-task_zoxide() {
-  echo "  [zoxide] Installing..."
-
-  # Binary
-  ensure_local_bin
-  if ! command -v zoxide >/dev/null 2>&1; then
-    echo "    Downloading latest zoxide binary..."
-    ARCH=$(uname -m)
-    case "$ARCH" in
-    x86_64) ARCH="x86_64" ;;
-    aarch64) ARCH="aarch64" ;;
-    *)
-      echo "    Unsupported architecture: $ARCH"
-      exit 1
-      ;;
-    esac
-    ZOXIDE_URL="https://github.com/ajeetdsouza/zoxide/releases/latest/download/zoxide-${ARCH}-unknown-linux-musl"
-    curl -fsSL "$ZOXIDE_URL" -o "$LOCAL_BIN/zoxide"
-    chmod +x "$LOCAL_BIN/zoxide"
-    echo "    Installed to $LOCAL_BIN/zoxide"
-  else
-    echo "    Binary already installed at $(command -v zoxide)"
-  fi
-
-  # Shell integration (bash)
-  echo "    Adding shell integration to ~/.bashrc..."
-  ensure_line "$BASHRC" 'eval "$(zoxide init bash --cmd cd)"'
-
-  echo "  [zoxide] Done."
-}
-
-# ==================================================
-# Task: Install sesh binary
-# ==================================================
-task_sesh() {
-  echo "  [sesh] Installing..."
-
-  ensure_local_bin
-  if command -v sesh >/dev/null 2>&1; then
-    echo "    Binary already installed at $(command -v sesh)"
-    echo "  [sesh] Done."
-    return
-  fi
-
-  echo "    Downloading latest sesh binary..."
-  ARCH=$(uname -m)
-  case "$ARCH" in
-  x86_64) ARCH="x86_64" ;;
-  aarch64) ARCH="arm64" ;;
-  *)
-    echo "    Unsupported architecture: $ARCH"
-    exit 1
-    ;;
-  esac
-
-  SESH_URL="https://github.com/joshmedeski/sesh/releases/latest/download/sesh_Linux_${ARCH}.tar.gz"
-  curl -fsSL "$SESH_URL" | tar xz -C "$LOCAL_BIN" sesh
-  chmod +x "$LOCAL_BIN/sesh"
-  echo "    Installed to $LOCAL_BIN/sesh"
-  echo "  [sesh] Done."
-}
-
-# ==================================================
-# Task: Install tv (television) binary + shell integration
-# ==================================================
-task_tv() {
-  echo "  [tv] Installing..."
-
-  ensure_local_bin
-  if ! command -v tv >/dev/null 2>&1; then
-    echo "    Fetching latest tv release info..."
-    ARCH=$(uname -m)
-    case "$ARCH" in
-    x86_64) TV_TARGET="x86_64-unknown-linux-musl" ;;
-    aarch64) TV_TARGET="aarch64-unknown-linux-musl" ;;
-    *)
-      echo "    Unsupported architecture: $ARCH"
-      exit 1
-      ;;
-    esac
-
-    TV_URL=$(curl -fsSL https://api.github.com/repos/alexpasmantier/television/releases/latest |
-      grep browser_download_url |
-      grep "$TV_TARGET.tar.gz" |
-      grep -v sha256 |
-      head -1 |
-      cut -d '"' -f 4)
-
-    if [ -z "$TV_URL" ]; then
-      echo "    Failed to find download URL"
-      exit 1
-    fi
-
-    echo "    Downloading tv..."
-    TMPDIR=$(mktemp -d)
-    curl -fsSL "$TV_URL" | tar xz -C "$TMPDIR"
-    find "$TMPDIR" -type f -name "tv" -exec mv {} "$LOCAL_BIN/tv" \;
-    chmod +x "$LOCAL_BIN/tv"
-    rm -rf "$TMPDIR"
-    echo "    Installed to $LOCAL_BIN/tv"
-  else
-    echo "    Binary already installed at $(command -v tv)"
-  fi
-
-  # Shell integration (bash) — always run
-  echo "    Adding shell integration to ~/.bashrc..."
-  ensure_line "$BASHRC" 'eval "$(tv init bash)"'
-
-  echo "  [tv] Done."
-}
-
-# ==================================================
-# Task: Install fd binary
-# ==================================================
-task_fd() {
-  echo "  [fd] Installing..."
-
-  ensure_local_bin
-  if command -v fd >/dev/null 2>&1; then
-    echo "    Binary already installed at $(command -v fd)"
-    echo "  [fd] Done."
-    return
-  fi
-
-  echo "    Fetching latest fd release info..."
-  ARCH=$(uname -m)
-  case "$ARCH" in
-  x86_64) FD_TARGET="x86_64-unknown-linux-musl" ;;
-  aarch64) FD_TARGET="aarch64-unknown-linux-musl" ;;
-  *)
-    echo "    Unsupported architecture: $ARCH"
-    exit 1
-    ;;
-  esac
-
-  FD_URL=$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest |
-    grep browser_download_url |
-    grep "$FD_TARGET.tar.gz" |
-    head -1 |
-    cut -d '"' -f 4)
-
-  if [ -z "$FD_URL" ]; then
-    echo "    Failed to find download URL"
-    exit 1
-  fi
-
-  echo "    Downloading fd..."
-  TMPDIR=$(mktemp -d)
-  curl -fsSL "$FD_URL" | tar xz -C "$TMPDIR"
-  find "$TMPDIR" -type f -name "fd" -exec mv {} "$LOCAL_BIN/fd" \;
-  chmod +x "$LOCAL_BIN/fd"
-  rm -rf "$TMPDIR"
-  echo "    Installed to $LOCAL_BIN/fd"
-  echo "  [fd] Done."
-}
-
-# ==================================================
-# Task: Install yazi binary
-# ==================================================
-task_yazi() {
-  echo "  [yazi] Installing..."
-
-  ensure_local_bin
-  if command -v yazi >/dev/null 2>&1; then
-    echo "    Binary already installed at $(command -v yazi)"
-    echo "  [yazi] Done."
-    return
-  fi
-
-  echo "    Fetching latest yazi release info..."
-  ARCH=$(uname -m)
-  case "$ARCH" in
-  x86_64) YAZI_TARGET="x86_64-unknown-linux-musl" ;;
-  aarch64) YAZI_TARGET="aarch64-unknown-linux-musl" ;;
-  *)
-    echo "    Unsupported architecture: $ARCH"
-    exit 1
-    ;;
-  esac
-
-  YAZI_URL=$(curl -fsSL https://api.github.com/repos/sxyazi/yazi/releases/latest |
-    grep browser_download_url |
-    grep "$YAZI_TARGET.zip" |
-    head -1 |
-    cut -d '"' -f 4)
-
-  if [ -z "$YAZI_URL" ]; then
-    echo "    Failed to find download URL"
-    exit 1
-  fi
-
-  echo "    Downloading yazi..."
-  TMPDIR=$(mktemp -d)
-  curl -fsSL "$YAZI_URL" -o "$TMPDIR/yazi.zip"
-  unzip -qo "$TMPDIR/yazi.zip" -d "$TMPDIR"
-  find "$TMPDIR" -type f -name "yazi" -exec mv {} "$LOCAL_BIN/yazi" \;
-  find "$TMPDIR" -type f -name "ya" -exec mv {} "$LOCAL_BIN/ya" \;
-  chmod +x "$LOCAL_BIN/yazi" "$LOCAL_BIN/ya"
-  rm -rf "$TMPDIR"
-  echo "    Installed to $LOCAL_BIN/yazi and $LOCAL_BIN/ya"
-  echo "  [yazi] Done."
 }
 
 # ==================================================
@@ -502,24 +390,6 @@ task_herdr_config() {
 }
 
 # ==================================================
-# Task: Install herdr binary
-# ==================================================
-task_herdr() {
-  echo "  [herdr] Installing..."
-
-  if command -v herdr >/dev/null 2>&1; then
-    echo "    Binary already installed at $(command -v herdr)"
-    echo "  [herdr] Done."
-    return
-  fi
-
-  ensure_local_bin
-  echo "    Running official herdr installer..."
-  curl -fsSL https://herdr.dev/install.sh | sh
-  echo "  [herdr] Done."
-}
-
-# ==================================================
 # Task: Install Maple Mono Nerd Font
 # ==================================================
 task_maple_font() {
@@ -596,21 +466,17 @@ task_nvim() {
 main() {
   echo "==> Installing dotfiles..."
 
+  task_mise
+  task_mise_config
+  task_mise_install
   task_bash_preexec
   task_tpm
   task_tmux_config
   task_herdr_config
-  task_herdr
-  task_fzf
-  task_zoxide
-  task_fd
-  task_sesh
-  task_tv
   task_atuin
   task_ghostty
   # task_install_ghostty
   task_kitty
-  task_yazi
   task_maple_font
   task_nvim
   # task_git        # TODO
@@ -620,6 +486,7 @@ main() {
   echo "    Run:  source ~/.bashrc"
   echo "    Then: tmux source-file ~/.config/tmux/tmux.conf"
   echo "    Then in tmux: Prefix + I  (install plugins)"
+  echo "    Update mise tools: mise upgrade"
 }
 
 main "$@"
