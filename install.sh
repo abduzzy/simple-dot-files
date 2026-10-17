@@ -466,6 +466,60 @@ task_install_ghostty() {
 }
 
 # ==================================================
+# Task: Deploy herdr config
+# ==================================================
+task_herdr_config() {
+  echo "  [herdr] Deploying herdr config..."
+
+  HERDR_CONFIG_DIR="$HOME/.config/herdr"
+
+  deploy_h_stow() {
+    cd "$DOTFILES"
+    stow -R --target="$HOME" .
+  }
+
+  deploy_h_ln() {
+    mkdir -p "$HERDR_CONFIG_DIR"
+    ln -sf "$DOTFILES/.config/herdr/config.toml" "$HERDR_CONFIG_DIR/config.toml"
+  }
+
+  deploy_h_cp() {
+    mkdir -p "$HERDR_CONFIG_DIR"
+    cp "$DOTFILES/.config/herdr/config.toml" "$HERDR_CONFIG_DIR/config.toml"
+  }
+
+  if command -v stow >/dev/null 2>&1; then
+    echo "    Using stow..."
+    deploy_h_stow
+  elif command -v ln >/dev/null 2>&1; then
+    echo "    Creating symlinks..."
+    deploy_h_ln
+  else
+    echo "    Copying files..."
+    deploy_h_cp
+  fi
+  echo "  [herdr] Done."
+}
+
+# ==================================================
+# Task: Install herdr binary
+# ==================================================
+task_herdr() {
+  echo "  [herdr] Installing..."
+
+  if command -v herdr >/dev/null 2>&1; then
+    echo "    Binary already installed at $(command -v herdr)"
+    echo "  [herdr] Done."
+    return
+  fi
+
+  ensure_local_bin
+  echo "    Running official herdr installer..."
+  curl -fsSL https://herdr.dev/install.sh | sh
+  echo "  [herdr] Done."
+}
+
+# ==================================================
 # Task: Install Maple Mono Nerd Font
 # ==================================================
 task_maple_font() {
@@ -545,6 +599,8 @@ main() {
   task_bash_preexec
   task_tpm
   task_tmux_config
+  task_herdr_config
+  task_herdr
   task_fzf
   task_zoxide
   task_fd
@@ -552,7 +608,7 @@ main() {
   task_tv
   task_atuin
   task_ghostty
-  task_install_ghostty
+  # task_install_ghostty
   task_kitty
   task_yazi
   task_maple_font
